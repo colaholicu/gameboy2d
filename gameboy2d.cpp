@@ -19,6 +19,8 @@ BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 
+Gameboy2d* gb2d = NULL;
+
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPTSTR    lpCmdLine,
@@ -44,15 +46,28 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_GAMEBOY2D));
 
+    gb2d = new Gameboy2d();
+
 	// Main message loop:
-	while (GetMessage(&msg, NULL, 0, 0))
-	{
-		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-	}
+    while (true)
+    {
+	    if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+	    {
+            if (msg.message == WM_QUIT)
+                break;
+
+		    if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+		    {
+			    TranslateMessage(&msg);
+			    DispatchMessage(&msg);
+		    } else {
+                gb2d->Cycle();
+                gb2d->Draw();
+            }
+	    }
+    }
+
+    delete gb2d;
 
 	return (int) msg.wParam;
 }
