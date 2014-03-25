@@ -85,6 +85,7 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="typedefs.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="d2dwrap.cpp" />
