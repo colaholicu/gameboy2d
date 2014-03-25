@@ -1,8 +1,7 @@
 #pragma once
-class gameboy2d
+class Gameboy2d
 {
 public:
-    gameboy2d(void);
-    virtual ~gameboy2d(void);
+    Gameboy2d(void);
+    virtual ~Gameboy2d(void);
 };
-

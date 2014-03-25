@@ -16,3 +16,15 @@ gameboy2d.sdf
 gameboy2d.v11.suo
 gameboy2d.vcxproj.filters
 ipch/gameboy2d-e8c033c8/gameboy2d-8eebaa86.ipch
+*.obj
+Debug/gameboy2d.ilk
+Debug/gameboy2d.lastbuildstate
+Debug/gameboy2d.log
+Debug/gameboy2d.pdb
+Debug/gameboy2d.pch
+Debug/gameboy2d.res
+Debug/link-cvtres.read.1.tlog
+Debug/link-cvtres.write.1.tlog
+*.tlog
+*.idb
+*.pdb

@@ -3,6 +3,8 @@
 
 #include "stdafx.h"
 #include "gameboy2d.h"
+#include "emucore.h"
+#include "d2dwrap.h"
 
 #define MAX_LOADSTRING 100
 

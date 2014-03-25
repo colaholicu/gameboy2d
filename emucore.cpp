@@ -2,11 +2,11 @@
 #include "emucore.h"
 
 
-gameboy2d::gameboy2d(void)
+Gameboy2d::Gameboy2d(void)
 {
 }
 
 
-gameboy2d::~gameboy2d(void)
+Gameboy2d::~Gameboy2d(void)
 {
 }
