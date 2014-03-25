@@ -29,3 +29,5 @@ Debug/link-cvtres.write.1.tlog
 *.idb
 *.pdb
 Specifications.htm
+*.pdf
+*.user
