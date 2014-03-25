@@ -1,6 +1,7 @@
 #pragma once
 
 #include "typedefs.h"
+#include <string>
 
 #define SCREEN_WIDTH    (160)
 #define SCREEN_HEIGHT   (144)
@@ -48,6 +49,9 @@ public:
     Gameboy2d(void);
     virtual ~Gameboy2d(void);
 
-    void Cycle();
-    void Draw();
+    bool    Initialize();
+    bool    LoadRom(std::string strFileName);
+
+    void    Cycle();
+    void    Draw();
 };
