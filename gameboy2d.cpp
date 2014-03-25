@@ -19,7 +19,7 @@ BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 
-Gameboy2d* gb2d = NULL;
+static Gameboy2d gb2d;
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -46,7 +46,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_GAMEBOY2D));
 
-    gb2d = new Gameboy2d();
+    if (!gb2d.Initialize())
+        return FALSE;
 
 	// Main message loop:
     while (true)
@@ -61,13 +62,11 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			    TranslateMessage(&msg);
 			    DispatchMessage(&msg);
 		    } else {
-                gb2d->Cycle();
-                gb2d->Draw();
+                gb2d.Cycle();
+                gb2d.Draw();
             }
 	    }
     }
-
-    delete gb2d;
 
 	return (int) msg.wParam;
 }
