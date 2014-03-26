@@ -21,7 +21,7 @@ private:
     u16 PC; // program counter
     u16 SP; // stack pointer
 
-    u16 opcode; // opcode
+    u8  opcode; // opcode
 
     /*___________________________MEMORY_MAP__________________________________
     0000-3FFF   16KB ROM Bank 00     (in cartridge, fixed at bank 00)
@@ -39,6 +39,8 @@ private:
     u8  memory[0xffff];
 
     u8  screen[SCREEN_SIZE];
+
+    bool onBoot;
 
 protected:
 

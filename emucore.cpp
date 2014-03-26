@@ -30,6 +30,7 @@ const u8 nintendo_bios[256] = {
 
 Gameboy2d::Gameboy2d(void)
 {
+    onBoot = true;
     ZeroMem();
 }
 
@@ -44,12 +45,24 @@ void Gameboy2d::ZeroMem()
     ZeroMemory(memory, 0xffff);
     ZeroMemory(screen, SCREEN_SIZE);
 
+    opcode = 0;
+
     AF.val = BC.val = DE.val = HL.val = PC = SP = 0;
     IR = RR = 0;
 }
 
+void Gameboy2d::decode()
+{
+    opcode = memory[PC];
+
+    switch (opcode)
+    {
+    }
+}
+
 void Gameboy2d::Cycle()
 {
+    decode();
 }
 
 void Gameboy2d::Draw()
@@ -59,7 +72,11 @@ void Gameboy2d::Draw()
 bool Gameboy2d::Initialize()
 {
     memcpy(memory, nintendo_bios, sizeof(nintendo_bios));
-    memcpy(memory + 0x0104, nintendo_logo, sizeof(nintendo_logo));
+    memcpy(memory + 0x104, nintendo_logo, sizeof(nintendo_logo));
+
+    PC = 0x150;
+    SP = 0xfffe;
+
     return true;
 }
 
