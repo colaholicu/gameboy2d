@@ -1,14 +1,19 @@
 #pragma once
 
-typedef unsigned char   u8;
-typedef unsigned short  u16;
-typedef unsigned int    u32;
+typedef unsigned char       uint8;
+typedef signed char         int8;
+typedef unsigned short      uint16;
+typedef signed short        int16;
+typedef unsigned int        uint32;
+typedef signed int          int32;
+typedef unsigned long long  uint64;
+typedef signed long long    int64;
 
 typedef union _reg16
 {
-    u16 val;
+    uint16 val;
     struct {
-        u8 lo;
-        u8 hi;
+        uint8 lo;
+        uint8 hi;
     } u;
 } reg;

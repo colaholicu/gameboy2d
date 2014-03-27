@@ -63,7 +63,13 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			    DispatchMessage(&msg);
 		    }
 	    } else {
-            gb2d.Cycle();
+            static DWORD nTickStart = 0;
+            DWORD nTickCount = GetTickCount();
+            if (nTickCount - nTickStart < FPS(60))
+                continue;
+
+            gb2d.Emulate(EMUCLOCK(60));
+
             gb2d.Draw();
         }
     }

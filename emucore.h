@@ -1,7 +1,6 @@
 #pragma once
 
-#include "typedefs.h"
-#include <string>
+#include "inc.h"
 
 #define SCREEN_WIDTH    (160)
 #define SCREEN_HEIGHT   (144)
@@ -10,18 +9,22 @@
 #define Z   ((AF.u.lo) & 0x80) // Zero flag
 #define C   ((AF.u.lo) & 0x10) // Carry flag
 
+#define FPS(_fps)   (1000/(_fps))
+
+#define EMUCLOCK(_fps)  (4194304/(_fps))
+
 class Gameboy2d
 {
 private:    
-    reg AF, BC, DE, HL; // registers
+    reg     AF, BC, DE, HL; // registers
 
-    u8  IR; // interrupt register
-    u8  RR; // refresh register
+    uint8   IR; // interrupt register
+    uint8   RR; // refresh register
 
-    u16 PC; // program counter
-    u16 SP; // stack pointer
+    uint16  PC; // program counter
+    uint16  SP; // stack pointer
 
-    u8  opcode; // opcode
+    uint8   opcode; // opcode
 
     /*___________________________MEMORY_MAP__________________________________
     0000-3FFF   16KB ROM Bank 00     (in cartridge, fixed at bank 00)
@@ -36,16 +39,24 @@ private:
     FF00-FF7F   I/O Ports
     FF80-FFFE   High RAM (HRAM)
     FFFF        Interrupt Enable Register */
-    u8  memory[0xffff];
+    
+    std::array<uint8, 0x10000>       memory;
 
-    u8  screen[SCREEN_SIZE];
+    std::array<uint8, SCREEN_SIZE>  screen;
 
-    bool onBoot;
+    std::vector<uint8>              rom; // The whole ROM buffer
+
+    int32   decode();
+    void    defaultInternals();
 
 protected:
 
-    void decode();
-    void ZeroMem();
+    void    Clear();
+
+    int32   ProcessOpcode();
+    void    UpdateGfx(int32 nCycles);
+    void    UpdateTm(int32 nCycles);
+    void    Interrupt();
 
 public:
     Gameboy2d(void);
@@ -54,6 +65,7 @@ public:
     bool    Initialize();
     bool    LoadRom(std::string strFileName);
 
-    void    Cycle();
+    void    Emulate(int32 nMaxCycles);
+    
     void    Draw();
 };
