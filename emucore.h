@@ -19,8 +19,10 @@
 #define PC  (pc.val)
 #define SP  (sp.val)
 
+#define _INLINE_FUNCS
+
 class Gameboy2d
-{
+{    
 private:    
     reg     AF, BC, DE, HL; // registers
 
@@ -54,9 +56,16 @@ private:
 
     std::vector<uint8>              vRom; // The whole ROM buffer
 
+    ROMType mROMType;
+    ROMBank mROMBank;
+    uint8   nCrtBank;
+
+    void    fetchOpcode();
     int32   decode();
+    int32   decodeEx();    
     void    defaultInternals();
 
+#if defined(_INLINE_FUNCS)
     // call to nn, SP=SP-2, (SP)=PC, PC=nn
     inline void _call(uint16 hAddr)
     {
@@ -64,6 +73,23 @@ private:
         $(SP) = pc.u.lo;
         $(SP+1) = pc.u.hi;
         PC = hAddr;
+    };
+
+    // Reset bit b in register
+    inline void _res(uint8 bit, reg& Reg, bool hi = true)
+    {
+        if (hi)
+            Reg.u.hi &= ~(1 << bit);
+        else
+            Reg.u.lo &= ~(1 << bit);
+    }
+
+    // return from subroutine
+    inline void _ret()
+    {
+        pc.u.lo = $(SP);
+        pc.u.hi = $(SP+1);
+        SP += 2;
     };
     
     // jump to nn, PC=nn
@@ -83,6 +109,9 @@ private:
     inline void _ld(uint16 nn, reg Reg)
     {
         $(nn) = AF.u.hi;
+        char buf[64] = {0};
+        sprintf_s(buf, "#### writing at %x\n", nn);
+        OutputDebugString(buf);
         PC += 3;
     };
 
@@ -112,6 +141,15 @@ private:
         $(0xff00 + n) = Reg.u.hi;
         PC += 2;
     };
+
+    // ldh REG, (n) -> $(FF00+n) = REG.u.hi
+    inline void _ldh(reg Reg, uint8 n)
+    {
+        Reg.u.hi =$(0xff00 + n);
+        PC += 2;
+    };
+
+#endif // defined(_INLINE_FUNCS)
 
 protected:
 

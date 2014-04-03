@@ -30,11 +30,7 @@ void Gameboy2d::Clear()
 
 int32 Gameboy2d::ProcessOpcode()
 {
-    opcode = $(PC);
-
-    // gameboy is little endian (hi is on 2nd byte)
-    _nn = $(PC+1) | ($(PC+2) << 8);
-    _n = $(PC+1);
+    fetchOpcode();
 
     if (!opcode)
     {
@@ -43,6 +39,15 @@ int32 Gameboy2d::ProcessOpcode()
     }
 
     return decode();
+}
+
+void Gameboy2d::fetchOpcode()
+{
+    opcode = $(PC);
+
+    // gameboy is little endian (hi is on 2nd byte)
+    _nn = $(PC+1) | ($(PC+2) << 8);
+    _n = $(PC+1);
 }
 
 int32 Gameboy2d::decode()
@@ -61,28 +66,66 @@ int32 Gameboy2d::decode()
     case 0x3e: // ld A, d8
         _ld(AF, _n);
         return 8;
+    case 0x44: // ld B, H
+        _ld(AF, true, HL, true);
+        return 4;
     case 0x7c: // ld A, H
         _ld(AF, true, HL, true);
         return 4;
     case 0x7d: // ld A, L
         _ld(AF, true, HL, false);
         return 4;
+    case 0xcb:
+        ++PC;
+        fetchOpcode();
+        return (4 + decodeEx());
     case 0xc3: // jump to nn, PC=nn
         _jump(_nn);
         return 16;//10;
     case 0xcd: // call to nn, SP=SP-2, (SP)=PC, PC=nn
         _call(_nn);
         return 24;//17;
+    case 0xc9: // return from subroutine
+        _ret();
+        return 16;
     case 0xe0: // ldh (n),A -> $(FF00+n),A (AF.hi)
         _ldh(_n, AF);
         return 12;
     case 0xea:
         _ld(_nn, AF); // ld $(nn), A (AF.hi)
         return 16;
+    case 0xf0: // ldh A,(n)
+        _ldh(AF, _n);
+        return 12;
     case 0xf3: // disable interrupts, IME=0
         $(0xffff) = 0;
-        PC += 1;
-        return 4;    
+        ++PC;
+        return 4;
+    case 0xfe: // compare A with n & set flags
+        AF.u.lo |= 0x40;
+        if (AF.u.hi == _n)
+            AF.u.lo |= 0x80;
+
+        PC += 2;
+        return 8;
+    case 0xff: // restart immediate u8
+        _call(_n << 8);
+        return 16;
+    default:
+        assert(0);
+    }
+
+    return 0;
+}
+
+int32 Gameboy2d::decodeEx()
+{
+    PC += 2;
+    switch (opcode)
+    {
+    case 0x87:
+        _res(_n & 0x0f, AF);
+        return 8;
     default:
         assert(0);
     }
@@ -164,7 +207,7 @@ bool Gameboy2d::Initialize()
 {
     defaultInternals();
 
-    if (!LoadRom("C:\\cpu_instrs.gb")) 
+    if (!LoadRom("C:\\zelda.gb")) 
     {
         vRom.resize(0);        
         return false;
@@ -199,6 +242,10 @@ bool Gameboy2d::LoadRom(std::string strFileName)
         fs.close();
         return false;        
     }
+
+    mROMType = static_cast<ROMType>(vRom.at(0x147));
+    mROMBank = static_cast<ROMBank>(vRom.at(0x148));
+    nCrtBank = 0;
 
     fs.close();
     return true;

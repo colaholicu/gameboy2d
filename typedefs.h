@@ -17,3 +17,13 @@ typedef union _reg16
         uint8 hi;
     } u;
 } reg;
+
+typedef enum _romType
+{
+    MBC0 = 0x0, MBC1, MBC1_RAM, MBC1_RAM_BATTERY, MBC2,
+} ROMType;
+
+typedef enum _romBank
+{
+    Bank0 = 0x0, Bank4, Bank8, Bank16, Bank32, Bank64,
+} ROMBank;
