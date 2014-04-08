@@ -6,8 +6,13 @@
 #define SCREEN_HEIGHT   (144)
 #define SCREEN_SIZE     (160 * 144)
 
-#define Z   ((AF.u.lo) & 0x80) // Zero flag
-#define C   ((AF.u.lo) & 0x10) // Carry flag
+#define A   (AF.u.hi)
+#define F   (AF.u.lo)
+
+#define Z   (F & 0x80) // Zero flag
+#define N   (F & 0x40) // N flag
+#define H   (F & 0x20) // H flag
+#define C   (F & 0x10) // Carry flag
 
 #define FPS(_fps)   (1000/(_fps))
 
@@ -66,6 +71,34 @@ private:
     void    defaultInternals();
 
 #if defined(_INLINE_FUNCS)
+    // n & A, result in A, set flags
+    inline void _and(uint8 nX, uint8 nY)
+    {
+        A = nX & nY;
+
+        F &= 0x8;
+        F |= 0x2; 
+        if (!A)
+            F |= 0x8;
+
+        PC += 2;
+    }
+
+    // compare 8-bit with 8-bit
+    inline void _compare(uint8 nX, uint8 nY)
+    {
+        F |= 0x40;
+        if (nX == nY)
+            F |= 0x80;
+        else if (nX < nY)
+            F |= 0x10;
+
+        if ((nX & 0x10) < (nY & 0x10))
+            F |= 0x20;
+
+        PC += 2;
+    };
+
     // call to nn, SP=SP-2, (SP)=PC, PC=nn
     inline void _call(uint16 hAddr)
     {
@@ -108,7 +141,7 @@ private:
     // ld $(nn),REG -> $(nn) = REG.u.hi/lo
     inline void _ld(uint16 nn, reg Reg)
     {
-        $(nn) = AF.u.hi;
+        $(nn) = A;
         char buf[64] = {0};
         sprintf_s(buf, "#### writing at %x\n", nn);
         OutputDebugString(buf);

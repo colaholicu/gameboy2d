@@ -57,6 +57,15 @@ int32 Gameboy2d::decode()
     case 0x18: // JR r8 (PC = PC + signed(n))
         _jump(PC + static_cast<int8>(_n));
         return 12;
+    case 0x20: // JR NZ, r8 (PC = PC + signed(n)) if Z = 0
+        if (!Z)
+        {
+            _jump(PC + static_cast<int8>(_n));
+            return 12;
+        }
+
+        PC += 2;
+        return 8;
     case 0x21: // ld HL, nn
         _ld(HL, _nn);
         return 12;
@@ -91,6 +100,9 @@ int32 Gameboy2d::decode()
     case 0xe0: // ldh (n),A -> $(FF00+n),A (AF.hi)
         _ldh(_n, AF);
         return 12;
+    case 0xe6: // n & A, result store in A
+        _and(_n, A);
+        return 8;
     case 0xea:
         _ld(_nn, AF); // ld $(nn), A (AF.hi)
         return 16;
@@ -102,14 +114,10 @@ int32 Gameboy2d::decode()
         ++PC;
         return 4;
     case 0xfe: // compare A with n & set flags
-        AF.u.lo |= 0x40;
-        if (AF.u.hi == _n)
-            AF.u.lo |= 0x80;
-
-        PC += 2;
+        _compare(A, _n);
         return 8;
     case 0xff: // restart immediate u8
-        _call(_n << 8);
+        _call(0x0038);
         return 16;
     default:
         assert(0);
@@ -207,7 +215,7 @@ bool Gameboy2d::Initialize()
 {
     defaultInternals();
 
-    if (!LoadRom("C:\\zelda.gb")) 
+    if (!LoadRom("C:\\cpu_instrs.gb")) 
     {
         vRom.resize(0);        
         return false;
