@@ -34,3 +34,10 @@ Specifications.htm
 *.log
 *.htm
 *.js
+*.lastbuildstate
+*.unsuccessfulbuild
+*.ipch
+*.txt
+*.res
+*.pch
+*.ilk

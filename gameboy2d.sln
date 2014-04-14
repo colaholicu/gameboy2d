@@ -5,10 +5,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gameboy2d", "gameboy2d.vcxp
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug + NOP|Win32 = Debug + NOP|Win32
 		Debug|Win32 = Debug|Win32
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E40A486B-4297-4570-A969-2C0936C99755}.Debug + NOP|Win32.ActiveCfg = Debug + NOP|Win32
+		{E40A486B-4297-4570-A969-2C0936C99755}.Debug + NOP|Win32.Build.0 = Debug + NOP|Win32
 		{E40A486B-4297-4570-A969-2C0936C99755}.Debug|Win32.ActiveCfg = Debug|Win32
 		{E40A486B-4297-4570-A969-2C0936C99755}.Debug|Win32.Build.0 = Debug|Win32
 		{E40A486B-4297-4570-A969-2C0936C99755}.Release|Win32.ActiveCfg = Release|Win32
