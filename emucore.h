@@ -1,12 +1,12 @@
 #pragma once
 
 #include "inc.h"
+#include "Memory.h"
 
 #define SCREEN_WIDTH    (160)
 #define SCREEN_HEIGHT   (144)
 #define SCREEN_SIZE     (160 * 144)
 
-#if defined(NEW_OPCODE_PROCESSING)
 #define A   (af.u.hi)
 #define B   (bc.u.hi)
 #define C   (bc.u.lo)
@@ -15,23 +15,11 @@
 #define F   (af.u.lo)
 #define H   (hl.u.hi)
 #define L   (hl.u.lo)
-#else
-#define A   (AF.u.hi)
-#define B   (BC.u.hi)
-#define C   (BC.u.lo)
-#define D   (DE.u.hi)
-#define E   (DE.u.lo)
-#define F   (AF.u.lo)
-#define H   (HL.u.hi)
-#define L   (HL.u.lo)
-#endif
 
-#if defined(NEW_OPCODE_PROCESSING)
 #define AF  (af.val)
 #define BC  (bc.val)
 #define DE  (de.val)
 #define HL  (hl.val)
-#endif
 
 #define ZF  (F & 0x80) // Zero flag
 #define NF  (F & 0x40) // N flag
@@ -45,37 +33,20 @@
 // $ = aMemory (for ease of use)
 #define $(_at)    aMemory.at((_at))
 
-#if !defined(NEW_OPCODE_PROCESSING)
-#define PC  (pc.val)
-#define SP  (sp.val)
-#endif
-
-#define _INLINE_FUNCS // for posibility to hide whole block in MVC
-
 class Gameboy2d
 {    
-private:    
-#if defined(NEW_OPCODE_PROCESSING)
+private:
     reg     af, bc, de, hl; // registers
-#else
-    reg     AF, BC, DE, HL; // registers
-#endif
 
     uint8   IR; // interrupt register
     uint8   RR; // refresh register
 
-#if defined(NEW_OPCODE_PROCESSING)
     uint16  PC; // program counter
     uint16  SP; // stack pointer
-#else
-    reg     pc; // program counter
-    reg     sp; // stack pointer
-#endif
+
     uint16  m_nWord; // 16-bit temporary buffer variable (usually $PC+1 | ($PC+2 << 8))
     uint8   m_nByte; // 8-bit temporary buffer variable (usually $PC+1)
-#if defined(NEW_OPCODE_PROCESSING)
-    int32  m_nCycles;
-#endif
+    int32   m_nCycles;
 
     uint8   m_nOpcode; // m_nOpcode
 
@@ -95,7 +66,7 @@ private:
     FF80-FFFE   High RAM (HRAM)
     FFFF        Interrupt Enable Register */
     
-    std::array<uint8, 0x10000>      aMemory;
+    Memory  m_Memory;    
 
     std::array<uint8, SCREEN_SIZE>  aScreen;
 
@@ -111,8 +82,6 @@ private:
     int32   decodeEx();    
     void    defaultInternals();
 
-#if defined(_INLINE_FUNCS)
-#if defined(NEW_OPCODE_PROCESSING)
     // nothing, just advance PC and do 4 cycles
     inline void nop()
     {
@@ -1328,121 +1297,6 @@ lda8_end:
         else
             m_nCycles += 4;
     };
-
-#else
-    // n & A, result in A, set flags
-    inline void _and(uint8 nX, uint8 nY)
-    {
-        A = nX & nY;
-
-        F &= 0x8;
-        F |= 0x2; 
-        if (!A)
-            F |= 0x8;
-
-        PC += 2;
-    }
-
-    // compare 8-bit with 8-bit
-    inline void _compare(uint8 nX, uint8 nY)
-    {
-        F |= 0x40;
-        if (nX == nY)
-            F |= 0x80;
-        else if (nX < nY)
-            F |= 0x10;
-
-        if ((nX & 0x10) < (nY & 0x10))
-            F |= 0x20;
-
-        PC += 2;
-    };
-
-    // call to nn, SP=SP-2, (SP)=PC, PC=nn
-    inline void _call(uint16 hAddr)
-    {
-        SP -= 2;
-        $(SP) = pc.u.lo;
-        $(SP+1) = pc.u.hi;
-        PC = hAddr;
-    };
-
-    // Reset bit b in register
-    inline void _res(uint8 bit, reg& Reg, bool hi = true)
-    {
-        if (hi)
-            Reg.u.hi &= ~(1 << bit);
-        else
-            Reg.u.lo &= ~(1 << bit);
-    }
-
-    // return from subroutine
-    inline void _ret()
-    {
-        pc.u.lo = $(SP);
-        pc.u.hi = $(SP+1);
-        SP += 2;
-    };
-    
-    // jump to nn, PC=nn
-    inline void _jump(uint16 hAddr)
-    {
-        PC = hAddr;
-    }
-
-    // ld REG,nn -> REG(.val) = nn
-    inline void _ld(reg& Reg, uint16 nn)
-    {
-        Reg.val = nn;
-        PC += 3;
-    };
-
-    // ld $(nn),REG -> $(nn) = REG.u.hi/lo
-    inline void _ld(uint16 nn, reg Reg)
-    {
-        $(nn) = A;
-        char buf[64] = {0};
-        sprintf_s(buf, "#### writing at %x\n", nn);
-        OutputDebugString(buf);
-        PC += 3;
-    };
-
-    // ld REG,n -> REG.u.hi/lo = n
-    inline void _ld(reg& Reg, uint8 n, bool hi = true)
-    {
-        if (hi)
-            Reg.u.hi = n;
-        else
-            Reg.u.lo = n;
-        PC += 2;
-    };
-
-    // ld REG1,REG2 -> REG1.u.hi/lo = REG2.u.hi/lo
-    inline void _ld(reg& RegDst, bool dstHi, reg& RegSrc, bool srcHi)
-    {
-        if (dstHi)
-            RegDst.u.hi = srcHi ? RegSrc.u.hi : RegSrc.u.lo;
-        else
-            RegDst.u.lo = srcHi ? RegSrc.u.hi : RegSrc.u.lo;
-        ++PC;
-    };
-
-    // ldh (n),REG -> REG.u.hi = $(FF00+n)
-    inline void _ldh(uint8 n, reg Reg)
-    {
-        $(0xff00 + n) = Reg.u.hi;
-        PC += 2;
-    };
-
-    // ldh REG, (n) -> $(FF00+n) = REG.u.hi
-    inline void _ldh(reg Reg, uint8 n)
-    {
-        Reg.u.hi =$(0xff00 + n);
-        PC += 2;
-    };
-#endif
-
-#endif
 
 protected:
 

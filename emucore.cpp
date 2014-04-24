@@ -38,13 +38,8 @@ int32 Gameboy2d::ProcessOpcode()
 
     if (!m_nOpcode)
     {
-#if defined(NEW_OPCODE_PROCESSING)
         nop();
         return 4;
-#else
-        ++PC;
-        return 4;
-#endif
     }
 
     return decode();
@@ -63,7 +58,6 @@ int32 Gameboy2d::decode()
 {
     switch (m_nOpcode)
     {
-#if defined(NEW_OPCODE_PROCESSING)
     case 0x01:
         ldn16(regBC); break;
     case 0x02:
@@ -507,73 +501,6 @@ int32 Gameboy2d::decode()
         cp(valByte); break;
     case 0xff:
         rst(0x38); break;
-#else
-    case 0x18: // JR r8 (PC = PC + signed(n))
-        _jump(PC + static_cast<int8>(m_nByte));
-        return 12;
-    case 0x20: // JR NZ, r8 (PC = PC + signed(n)) if Z = 0
-        if (!ZF)
-        {
-            _jump(PC + static_cast<int8>(m_nByte));
-            return 12;
-        }
-
-        PC += 2;
-        return 8;
-    case 0x21: // ld HL, nn
-        _ld(HL, m_nWord);
-        return 12;
-    case 0x31: // ld SP, nn
-        _ld(sp, m_nWord);
-        return 12;
-    case 0x3e: // ld A, d8
-        _ld(AF, m_nByte);
-        return 8;
-    case 0x44: // ld B, H
-        _ld(AF, true, HL, true);
-        return 4;
-    case 0x7c: // ld A, H
-        _ld(AF, true, HL, true);
-        return 4;
-    case 0x7d: // ld A, L
-        _ld(AF, true, HL, false);
-        return 4;
-    case 0xcb:
-        ++PC;
-        fetchOpcode();
-        return (4 + decodeEx());
-    case 0xc3: // jump to nn, PC=nn
-        _jump(m_nWord);
-        return 16;//10;
-    case 0xcd: // call to nn, SP=SP-2, (SP)=PC, PC=nn
-        _call(m_nWord);
-        return 24;//17;
-    case 0xc9: // return from subroutine
-        _ret();
-        return 16;
-    case 0xe0: // ldh (n),A -> $(FF00+n),A (AF.hi)
-        _ldh(m_nByte, AF);
-        return 12;
-    case 0xe6: // n & A, result store in A
-        _and(m_nByte, A);
-        return 8;
-    case 0xea:
-        _ld(m_nWord, AF); // ld $(nn), A (AF.hi)
-        return 16;
-    case 0xf0: // ldh A,(n)
-        _ldh(AF, m_nByte);
-        return 12;
-    case 0xf3: // disable interrupts, IME=0
-        $(0xffff) = 0;
-        ++PC;
-        return 4;
-    case 0xfe: // compare A with n & set flags
-        _compare(A, m_nByte);
-        return 8;
-    case 0xff: // restart immediate u8
-        _call(0x0038);
-        return 16;
-#endif
     default:
         assert(0);
     }
@@ -590,13 +517,9 @@ int32 Gameboy2d::decode()
 }
 
 int32 Gameboy2d::decodeEx()
-{    
-#if !defined(NEW_OPCODE_PROCESSING)
-    PC += 1;
-#endif 
+{
     switch (m_nOpcode)
-    {    
-#if defined(NEW_OPCODE_PROCESSING) 
+    {
     case 0x18:
         rr(regB); break;
     case 0x19:
@@ -645,11 +568,6 @@ int32 Gameboy2d::decodeEx()
         res(regHL); break;
     case 0x87:
         res(regA); break;
-#else
-    case 0x87:
-        _res(m_nByte & 0x0f, AF);
-        return 8;
-#endif
     default:
         assert(0);
     }
@@ -659,7 +577,6 @@ int32 Gameboy2d::decodeEx()
 
 void Gameboy2d::Emulate(int32 nMaxCycles)
 {
-#if defined(NEW_OPCODE_PROCESSING)
     m_nCycles = 0;
     while ((nMaxCycles -= m_nCycles) > 0)
     {
@@ -669,16 +586,6 @@ void Gameboy2d::Emulate(int32 nMaxCycles)
         UpdateTm(m_nCycles);
         Interrupt();
     }
-#else
-    int32 nCycles = 0;
-    while ((nMaxCycles -= nCycles) > 0)
-    {
-        nCycles = ProcessOpcode();
-        UpdateGfx(nCycles);
-        UpdateTm(nCycles);
-        Interrupt();
-    }
-#endif
 }
 
 void Gameboy2d::Interrupt()
@@ -701,22 +608,13 @@ void Gameboy2d::defaultInternals()
 {
     PC = 0x100;
     SP = 0xfffe;
-#if defined(NEW_OPCODE_PROCESSING)
     AF = 0x01b0;
     BC = 0x0013;
     DE = 0x00d8;
     HL = 0x014d;
-#else
-    AF.val = 0x01b0;
-    BC.val = 0x0013;
-    DE.val = 0x00d8;
-    HL.val = 0x014d;
-#endif
 
     m_nWord = m_nOpcode = 0;
-#if defined(NEW_OPCODE_PROCESSING)
     m_nCycles = 0;
-#endif
     m_nByte = 0;
 
     $(0xff05) = 0x00; 
