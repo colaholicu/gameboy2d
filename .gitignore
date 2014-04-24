@@ -41,3 +41,6 @@ Specifications.htm
 *.res
 *.pch
 *.ilk
+*.asm
+*.exe
+*.exe

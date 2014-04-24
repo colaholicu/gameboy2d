@@ -65,265 +65,448 @@ int32 Gameboy2d::decode()
     {
 #if defined(NEW_OPCODE_PROCESSING)
     case 0x01:
-        ldn16(LDN_BC);
-        break;
+        ldn16(regBC); break;
+    case 0x02:
+        ldn8a(regBC); break;
+    case 0x03:
+        inc16(regBC); break;
+    case 0x04:
+        inc8(regB); break;
+    case 0x05:
+        dec8(regB); break;
+    case 0x06:
+        ldn8(regB); break;
+    case 0x08:
+        ldnSP(); break;
+    case 0x09:
+        addHL(regBC); break;
     case 0x0a:
-        lda8(LDA_BC);
-        break;
+        ldan8(regBC); break;
+    case 0x0b:
+        dec16(regBC); break;
+    case 0x0c:
+        inc8(regC); break;
+    case 0x0d:
+        dec8(regC); break;
+    case 0x0e:
+        ldn8(regC); break;
+    case 0x10:
+        stop(); break;
     case 0x11:
-        ldn16(LDN_DE);
-        break;
+        ldn16(regDE); break;
+    case 0x12:
+        ldn8a(regDE); break;
+    case 0x13:
+        inc16(regDE); break;
+    case 0x14:
+        inc8(regD); break;
+    case 0x15:
+        dec8(regD); break;
+    case 0x16:
+        ldn8(regD); break;
     case 0x18:
-        jrn(m_nByte);
-        break;
+        jrn(m_nByte); break;
+    case 0x19:
+        addHL(regDE); break;
     case 0x1a:
-        lda8(LDA_DE);
-        break;
+        ldan8(regDE); break;
+    case 0x1b:
+        dec16(regDE); break;
+    case 0x1c:
+        inc8(regE); break;
+    case 0x1d:
+        dec8(regE); break;
+    case 0x1e:
+        ldn8(regE); break;
     case 0x20:
-        jrccn(JRC_NZ);
-        break;
+        jrccn(C_NZ); break;
     case 0x21:
-        ldn16(LDN_HL);
-        break;
+        ldn16(regHL); break;
+    case 0x22:
+        ldhli(true); break;
+    case 0x23:
+        inc16(regHL); break;
+    case 0x24:
+        inc8(regH); break;
+    case 0x25:
+        dec8(regH); break;
+    case 0x26:
+        ldn8(regH); break;
     case 0x28:
-        jrccn(JRC_Z);
-        break;
+        jrccn(C_Z); break;
+    case 0x29:
+        addHL(regHL); break;
+    case 0x2a:
+        ldhli(false); break;
+    case 0x2b:
+        dec16(regHL); break;
+    case 0x2c:
+        inc8(regL); break;
+    case 0x2d:
+        dec8(regL); break;
+    case 0x2e:
+        ldn8(regL); break;
+    case 0x2f:
+        cpl(); break;
     case 0x30:
-        jrccn(JRC_NC);
-        break;
+        jrccn(C_NC); break;
     case 0x31:
-        ldn16(LDN_SP);
-        break;
+        ldn16(regSP); break;
+    case 0x33:
+        inc16(regSP); break;
+    case 0x34:
+        inc8(regHL); break;
+    case 0x35:
+        dec8(regHL); break;
+    case 0x36:
+        ldrr(regHL, valByte); break;
     case 0x38:
-        jrccn(JRC_C);
-        break;
+        jrccn(C_C); break;
+    case 0x39:
+        addHL(regSP); break;
+    case 0x3b:
+        dec16(regSP); break;
+    case 0x3c:
+        inc8(regA); break;
+    case 0x3d:
+        dec8(regA); break;
     case 0x3e:
-        lda8(LDA_N);
-        break;
+        ldan8(valByte); break;
+    case 0x3f:
+        ccf(); break;
     case 0x40:
-        ldrr(LDR_C, LDR_C);
-        break;
+        ldrr(regB, regB); break;
     case 0x41:
-        ldrr(LDR_C, LDR_C);
-        break;
+        ldrr(regB, regC); break;
     case 0x42:
-        ldrr(LDR_C, LDR_D);
-        break;
+        ldrr(regB, regD); break;
     case 0x43:
-        ldrr(LDR_C, LDR_E);
-        break;
+        ldrr(regB, regE); break;
     case 0x44:
-        ldrr(LDR_C, LDR_H);
-        break;
+        ldrr(regB, regH); break;
     case 0x45:
-        ldrr(LDR_C, LDR_L);
-        break;
+        ldrr(regB, regL); break;
     case 0x46:
-        ldrr(LDR_C, LDR_HL);
-        break;
+        ldrr(regB, regHL); break;
+    case 0x47:
+        ldn8a(regB); break;
     case 0x48:
-        ldrr(LDR_C, LDR_B);
-        break;
+        ldrr(regC, regB); break;
     case 0x49:
-        ldrr(LDR_C, LDR_C);
-        break;
+        ldrr(regC, regC); break;
     case 0x4a:
-        ldrr(LDR_C, LDR_D);
-        break;
+        ldrr(regC, regD); break;
     case 0x4b:
-        ldrr(LDR_C, LDR_E);
-        break;
+        ldrr(regC, regE); break;
     case 0x4c:
-        ldrr(LDR_C, LDR_H);
-        break;
+        ldrr(regC, regH); break;
     case 0x4d:
-        ldrr(LDR_C, LDR_L);
-        break;
+        ldrr(regC, regL); break;
     case 0x4e:
-        ldrr(LDR_C, LDR_HL);
-        break;
+        ldrr(regC, regHL); break;
+    case 0x4f:
+        ldn8a(regC); break;
     case 0x50:
-        ldrr(LDR_D, LDR_B);
-        break;
+        ldrr(regD, regB); break;
     case 0x51:
-        ldrr(LDR_D, LDR_C);
-        break;
+        ldrr(regD, regC); break;
     case 0x52:
-        ldrr(LDR_D, LDR_D);
-        break;
+        ldrr(regD, regD); break;
     case 0x53:
-        ldrr(LDR_D, LDR_E);
-        break;
+        ldrr(regD, regE); break;
     case 0x54:
-        ldrr(LDR_D, LDR_H);
-        break;
+        ldrr(regD, regH); break;
     case 0x55:
-        ldrr(LDR_D, LDR_L);
-        break;
+        ldrr(regD, regL); break;
     case 0x56:
-        ldrr(LDR_D, LDR_HL);
-        break;
+        ldrr(regD, regHL); break;
+    case 0x57:
+        ldn8a(regD); break;
     case 0x58:
-        ldrr(LDR_E, LDR_B);
-        break;
+        ldrr(regE, regB); break;
     case 0x59:
-        ldrr(LDR_E, LDR_C);
-        break;
+        ldrr(regE, regC); break;
     case 0x5a:
-        ldrr(LDR_E, LDR_D);
-        break;
+        ldrr(regE, regD); break;
     case 0x5b:
-        ldrr(LDR_E, LDR_E);
-        break;
+        ldrr(regE, regE); break;
     case 0x5c:
-        ldrr(LDR_E, LDR_H);
-        break;
+        ldrr(regE, regH); break;
     case 0x5d:
-        ldrr(LDR_E, LDR_L);
-        break;
+        ldrr(regE, regL); break;
     case 0x5e:
-        ldrr(LDR_E, LDR_HL);
-        break;
+        ldrr(regE, regHL); break;
+    case 0x5f:
+        ldn8a(regE); break;
     case 0x60:
-        ldrr(LDR_H, LDR_B);
-        break;
+        ldrr(regH, regB); break;
     case 0x61:
-        ldrr(LDR_H, LDR_C);
-        break;
+        ldrr(regH, regC); break;
     case 0x62:
-        ldrr(LDR_H, LDR_D);
-        break;
+        ldrr(regH, regD); break;
     case 0x63:
-        ldrr(LDR_H, LDR_E);
-        break;
+        ldrr(regH, regE); break;
     case 0x64:
-        ldrr(LDR_H, LDR_H);
-        break;
+        ldrr(regH, regH); break;
     case 0x65:
-        ldrr(LDR_H, LDR_L);
-        break;
+        ldrr(regH, regL); break;
     case 0x66:
-        ldrr(LDR_H, LDR_HL);
-        break;
+        ldrr(regH, regHL); break;
+    case 0x67:
+        ldn8a(regH); break;
     case 0x68:
-        ldrr(LDR_L, LDR_B);
-        break;
+        ldrr(regL, regB); break;
     case 0x69:
-        ldrr(LDR_L, LDR_C);
-        break;
+        ldrr(regL, regC); break;
     case 0x6a:
-        ldrr(LDR_L, LDR_D);
-        break;
+        ldrr(regL, regD); break;
     case 0x6b:
-        ldrr(LDR_L, LDR_E);
-        break;
+        ldrr(regL, regE); break;
     case 0x6c:
-        ldrr(LDR_L, LDR_H);
-        break;
+        ldrr(regL, regH); break;
     case 0x6d:
-        ldrr(LDR_L, LDR_L);
-        break;
+        ldrr(regL, regL); break;
     case 0x6e:
-        ldrr(LDR_L, LDR_HL);
-        break;
+        ldrr(regL, regHL); break;
+    case 0x6f:
+        ldn8a(regL); break;
+    case 0x70:
+        ldrr(regHL, regB); break;
+    case 0x71:
+        ldrr(regHL, regC); break;
+    case 0x72:
+        ldrr(regHL, regD); break;
+    case 0x73:
+        ldrr(regHL, regE); break;
+    case 0x74:
+        ldrr(regHL, regH); break;
+    case 0x75:
+        ldrr(regHL, regL); break;
+    case 0x77:
+        ldn8a(regHL); break;
     case 0x78:
-        lda8(LDA_B);
-        break;
+        ldan8(regB); break;
     case 0x79:
-        lda8(LDA_C);
-        break;
+        ldan8(regC); break;
     case 0x7a:
-        lda8(LDA_D);
-        break;
+        ldan8(regD); break;
     case 0x7b:
-        lda8(LDA_E);
-        break;
+        ldan8(regE); break;
     case 0x7c:
-        lda8(LDA_H);
-        break;
+        ldan8(regH); break;
     case 0x7d:
-        lda8(LDA_L);
-        break;
+        ldan8(regL); break;
     case 0x7e:
-        lda8(LDA_HL);
-        break;
+        ldan8(regHL); break;
     case 0x7f:
-        lda8(LDA_A);
-        break;
+        ldan8(regA); break;
+    case 0x80:
+        add(regB); break;
+    case 0x81:
+        add(regC); break;
+    case 0x82:
+        add(regD); break;
+    case 0x83:
+        add(regE); break;
+    case 0x84:
+        add(regH); break;
+    case 0x85:
+        add(regL); break;
+    case 0x86:
+        add(regHL); break;
+    case 0x87:
+        add(regA); break;
+    case 0x90:
+        sub(regB); break;
+    case 0x91:
+        sub(regC); break;
+    case 0x92:
+        sub(regD); break;
+    case 0x93:
+        sub(regE); break;
+    case 0x94:
+        sub(regH); break;
+    case 0x95:
+        sub(regL); break;
+    case 0x96:
+        sub(regHL); break;
+    case 0x97:
+        sub(regA); break;
+    case 0x98:
+        sbc(regB); break;
+    case 0x99:
+        sbc(regC); break;
+    case 0x9a:
+        sbc(regD); break;
+    case 0x9b:
+        sbc(regE); break;
+    case 0x9c:
+        sbc(regH); break;
+    case 0x9d:
+        sbc(regL); break;
+    case 0x9e:
+        sbc(regHL); break;
+    case 0x9f:
+        sbc(regA); break;
     case 0xa0:
-        and(LOG_B);
-        break;
+        and(regB); break;
     case 0xa1:
-        and(LOG_C);
-        break;
+        and(regC); break;
     case 0xa2:
-        and(LOG_D);
-        break;
+        and(regD); break;
     case 0xa3:
-        and(LOG_E);
-        break;
+        and(regE); break;
     case 0xa4:
-        and(LOG_H);
-        break;
+        and(regH); break;
     case 0xa5:
-        and(LOG_L);
-        break;
+        and(regL); break;
     case 0xa6:
-        and(LOG_HL);
-        break;
+        and(regHL); break;
     case 0xa7:
-        and(LOG_A);
-        break;    
+        and(regA); break;
+    case 0xa8:
+        xor(regB); break;
+    case 0xa9:
+        xor(regC); break;
+    case 0xaa:
+        xor(regD); break;
+    case 0xab:
+        xor(regE); break;
+    case 0xac:
+        xor(regH); break;
+    case 0xad:
+        xor(regL); break;
+    case 0xae:
+        xor(regHL); break;
+    case 0xaf:
+        xor(regA); break;
+    case 0xb0:
+        or(regB); break;
+    case 0xb1:
+        or(regC); break;
+    case 0xb2:
+        or(regD); break;
+    case 0xb3:
+        or(regE); break;
+    case 0xb4:
+        or(regH); break;
+    case 0xb5:
+        or(regL); break;
+    case 0xb6:
+        or(regHL); break;
+    case 0xb7:
+        or(regA); break;
     case 0xb8:
-        cp(CP_B);
-        break;
+        cp(regB); break;
     case 0xb9:
-        cp(CP_C);
-        break;
+        cp(regC); break;
     case 0xba:
-        cp(CP_D);
-        break;
+        cp(regD); break;
     case 0xbb:
-        cp(CP_E);
-        break;
+        cp(regE); break;
     case 0xbc:
-        cp(CP_H);
-        break;
+        cp(regH); break;
     case 0xbd:
-        cp(CP_L);
-        break;
+        cp(regL); break;
     case 0xbe:
-        cp(CP_HL);
-        break;
+        cp(regHL); break;
     case 0xbf:
-        cp(CP_A);
-        break;
+        cp(regA); break;
+    case 0xc0:
+        retcc(C_NZ); break;
+    case 0xc1:
+        pop(regBC); break;
+    case 0xc2:
+        jpcc(C_NZ); break;
     case 0xc3:
-        jp(m_nWord);
-        break;
+        jp(m_nWord); break;
+    case 0xc4:
+        callcc(m_nWord, C_NZ); break;
+    case 0xc5:
+        push(regBC); break;
+    case 0xc6:
+        add(valByte); break;
+    case 0xc7:
+        rst(0x00); break;
+    case 0xc8:
+        retcc(C_Z); break;
+    case 0xc9:
+        ret(); break;
+    case 0xca:
+        jpcc(C_Z); break;
     case 0xcb:
         nop();
         fetchOpcode();
         decodeEx();
         break;
+    case 0xcc:
+        callcc(m_nWord, C_Z); break;
     case 0xcd:
-        call(m_nWord);
-        break;
+        call(m_nWord); break;
+    case 0xcf:
+        rst(0x08); break;
+    case 0xd0:
+        retcc(C_NC); break;
+    case 0xd1:
+        pop(regDE); break;
+    case 0xd2:
+        jpcc(C_NC); break;
+    case 0xd4:
+        callcc(m_nWord, C_NC); break;
+    case 0xd5:
+        push(regDE); break;
+    case 0xd6:
+        sub(valByte); break;
+    case 0xd7:
+        rst(0x10); break;
+    case 0xd8:
+        retcc(C_C); break;
+    case 0xdc:
+        callcc(m_nWord, C_C); break;
+    case 0xdf:
+        rst(0x18); break;
+    case 0xda:
+        jpcc(C_C); break;
     case 0xe0:
-        ldh(false);
-        break;
+        ldh(false); break;
+    case 0xe1:
+        pop(regHL); break;
+    case 0xe5:
+        push(regHL); break;
     case 0xe6:
-        and(LOG_N);
-        break;
+        and(valByte); break;
+    case 0xe7:
+        rst(0x20); break;
+    case 0xea:
+        ldn8a(valWord); break;
+    case 0xee:
+        xor(valByte); break;
+    case 0xef:
+        rst(0x28); break;
     case 0xf0:
-        ldh(true);
-        break;
+        ldh(true); break;
+    case 0xf1:
+        pop(regAF); break;
+    case 0xf3:
+        toggleInterrupts(false); break;
+    case 0xf5:
+        push(regAF); break;
+    case 0xf6:
+        or(valByte); break;
+    case 0xf7:
+        rst(0x30); break;
+    case 0xf9:
+        ldSPHL(); break;
     case 0xfa:
-        lda8(LDA_NN);
-        break;
+        ldan8(valWord); break;
+    case 0xfb:
+        toggleInterrupts(true); break;
+    case 0xfd:
+        nop(); break;
     case 0xfe:
-        cp(CP_N);
-        break;
+        cp(valByte); break;
+    case 0xff:
+        rst(0x38); break;
 #else
     case 0x18: // JR r8 (PC = PC + signed(n))
         _jump(PC + static_cast<int8>(m_nByte));
@@ -395,6 +578,14 @@ int32 Gameboy2d::decode()
         assert(0);
     }
 
+    // disable/enable interrupts
+    if (m_nOpcode != 0xf3 && m_nOpcode != 0xfb && (IR & 0xf0))
+    {
+        IR &= 0x0f;
+        if (!IR)
+            $(0xffff) = 0;
+    }
+
     return 0;
 }
 
@@ -404,10 +595,56 @@ int32 Gameboy2d::decodeEx()
     PC += 1;
 #endif 
     switch (m_nOpcode)
-    {
+    {    
+#if defined(NEW_OPCODE_PROCESSING) 
+    case 0x18:
+        rr(regB); break;
+    case 0x19:
+        rr(regC); break;
+    case 0x1a:
+        rr(regD); break;
+    case 0x1b:
+        rr(regE); break;
+    case 0x1c:
+        rr(regH); break;
+    case 0x1d:
+        rr(regL); break;
+    case 0x1e:
+        rr(regHL); break;
+    case 0x1f:
+        rr(regA); break;
+    case 0x38:
+        srl(regB); break;
+    case 0x39:
+        srl(regC); break;
+    case 0x3a:
+        srl(regD); break;
+    case 0x3b:
+        srl(regE); break;
+    case 0x3c:
+        srl(regH); break;
+    case 0x3d:
+        srl(regL); break;
+    case 0x3e:
+        srl(regHL); break;
+    case 0x3f:
+        srl(regA); break;
+    case 0x80:
+        res(regB); break;
+    case 0x81:
+        res(regC); break;
+    case 0x82:
+        res(regD); break;
+    case 0x83:
+        res(regE); break;
+    case 0x84:
+        res(regH); break;
+    case 0x85:
+        res(regL); break;
+    case 0x86:
+        res(regHL); break;
     case 0x87:
-        //asd;
-#if defined(NEW_OPCODE_PROCESSING)    
+        res(regA); break;
 #else
     case 0x87:
         _res(m_nByte & 0x0f, AF);
@@ -426,7 +663,8 @@ void Gameboy2d::Emulate(int32 nMaxCycles)
     m_nCycles = 0;
     while ((nMaxCycles -= m_nCycles) > 0)
     {
-        ProcessOpcode();
+        if (!m_bStopped)
+            ProcessOpcode();
         UpdateGfx(m_nCycles);
         UpdateTm(m_nCycles);
         Interrupt();
@@ -518,7 +756,7 @@ bool Gameboy2d::Initialize()
 {
     defaultInternals();
 
-    if (!LoadRom("C:\\zelda.gb")) 
+    if (!LoadRom("C:\\cpu_instrs.gb")) 
     {
         vRom.resize(0);        
         return false;
@@ -554,10 +792,16 @@ bool Gameboy2d::LoadRom(std::string strFileName)
         return false;        
     }
 
+    fs.close();
+
     mROMType = static_cast<ROMType>(vRom.at(0x147));
     mROMBank = static_cast<ROMBank>(vRom.at(0x148));
     nCrtBank = 0;
 
-    fs.close();
+    // not supporting MBC2 and higher ROM types
+    if (mROMType > MBC1_RAM_BATTERY) {
+        return false;
+    }
+    
     return true;
 }

@@ -79,6 +79,8 @@ private:
 
     uint8   m_nOpcode; // m_nOpcode
 
+    bool    m_bStopped;
+
     /*___________________________MEMORY_MAP__________________________________
     0000-3FFF   16KB ROM Bank 00     (in cartridge, fixed at bank 00)
     4000-7FFF   16KB ROM Bank 01..NN (in cartridge, switchable bank number)
@@ -104,6 +106,7 @@ private:
     uint8   nCrtBank;
 
     void    fetchOpcode();
+    void    writeMemory(uint16 hAddr, uint8 data); 
     int32   decode();
     int32   decodeEx();    
     void    defaultInternals();
@@ -123,17 +126,13 @@ private:
         switch (sfParam)
         {
         case SF_Z:
-            F |= 0x80;
-            break;
+            F |= 0x80; break;
         case SF_N:
-            F |= 0x40;
-            break;
+            F |= 0x40; break;
         case SF_H:
-            F |= 0x20;
-            break;
+            F |= 0x20; break;
         case SF_C:
-            F |= 0x10;
-            break;
+            F |= 0x10; break;
         }
     }
 
@@ -143,25 +142,208 @@ private:
         switch (sfParam)
         {
         case SF_Z:
-            F &= 0x70;
-            break;
+            F &= 0x70; break;
         case SF_N:
-            F &= 0xb0;
-            break;
+            F &= 0xb0; break;
         case SF_H:
-            F &= 0xd0;
-            break;
+            F &= 0xd0; break;
         case SF_C:
-            F &= 0xe0;
-            break;
+            F &= 0xe0; break;
         }
     }
+
+    // Complement carry flag. If C flag is set, then reset it. If C flag is reset, then set it.
+    // Z - Not affected.
+    // N - Reset.
+    // H - Reset.
+    // C - Complemented.
+    inline void ccf()
+    {
+        if (CF)
+            resetFlag(SF_C);
+        else
+            setFlag(SF_C);
+
+        resetFlag(SF_N);
+        resetFlag(SF_H);
+
+        ++PC;
+        m_nCycles += 4;
+    };
+
+    // Complement A register. (Flip all bits.)
+    // Z - Not affected.
+    // N - Set.
+    // H - Set.
+    // C - Not affected.
+    inline void cpl()
+    {
+        A = ~A;
+
+        ++PC;
+        m_nCycles += 4;
+    };
+
+    // Shift n right into Carry. MSB set to 0. n = A,B,C,D,E,H,L,(HL)
+    // Z - Set if result is zero.
+    // N - Reset.
+    // H - Reset.
+    // C - Contains old bit 0 data.
+    inline void srl(OParam oParam)
+    {
+        uint8* pRegVal = NULL;
+        switch (oParam)
+        {
+        case regA:
+            pRegVal = &A; break;
+        case regB:
+            pRegVal = &B; break;
+        case regC:
+            pRegVal = &C; break;
+        case regD:
+            pRegVal = &D; break;
+        case regE:
+            pRegVal = &E; break;
+        case regH:
+            pRegVal = &H; break;
+        case regL:
+            pRegVal = &L; break;
+        case regHL:
+            pRegVal = &$(HL); break;
+        default:
+            assert(0);
+            return;
+        };
+
+        if (*pRegVal == 1)
+            setFlag(SF_Z);
+        
+        resetFlag(SF_N);
+        resetFlag(SF_H);
+
+        if (*pRegVal & 0x01)
+            setFlag(SF_C);
+        else
+            setFlag(SF_C);
+
+        *pRegVal >>= 1;
+
+        PC += 2;
+        m_nCycles += (oParam == regHL) ? 16 : 8;
+    }
+
+    // Rotate n right through Carry flag. n = A,B,C,D,E,H,L,(HL)
+    // Z - Set if result is zero.
+    // N - Reset.
+    // H - Reset.
+    // C - Contains old bit 0 data.
+    // ocf := cf, cf := R.0, R := [R >> 1] + [ocf << 7]
+    inline void rr(OParam oParam)
+    {
+        uint8* pRegVal = NULL;
+        uint8  nOldBit0 = 0;
+
+        switch (oParam)
+        {
+        case regA:
+            pRegVal = &A; break;
+        case regB:
+            pRegVal = &B; break;
+        case regC:
+            pRegVal = &C; break;
+        case regD:
+            pRegVal = &D; break;
+        case regE:
+            pRegVal = &E; break;
+        case regH:
+            pRegVal = &H; break;
+        case regL:
+            pRegVal = &L; break;
+        case regHL:
+            pRegVal = &$(HL); break;
+        default:
+            assert(0);
+            return;
+        };
+
+        nOldBit0 = *pRegVal & 0x01;        
+
+        *pRegVal = (*pRegVal >> 7) + (CF << 1);
+
+        if (!*pRegVal)
+            setFlag(SF_Z);
+
+        resetFlag(SF_N);
+        resetFlag(SF_H);
+
+        if (nOldBit0)
+            setFlag(SF_C);
+        else
+            resetFlag(SF_C);
+
+        PC += 2;
+        m_nCycles += (oParam == regHL) ? 16 : 8;
+    };
+
+    // This instruction disables/enables interrupts but not immediately. Interrupts are disabled after
+    // instruction after EI/DI is executed.
+    inline void toggleInterrupts(bool bOn)
+    {
+        // bit 7 = pending
+        // bit 0 = status (1 = to ON, 0 = to OFF)
+        IR |= 0x80;
+        if (bOn)
+            IR |= 0x01;
+        else
+            IR &= 0xfe;
+
+        ++PC;
+        m_nCycles += 4;;
+    }
+
+    inline void stop()
+    {
+        m_bStopped = true;
+        m_nCycles += 4 ;
+    };
 
     // Jump to address nn.
     inline void jp(uint16 nAddr)
     {
         PC = nAddr;
         m_nCycles += 12;
+    };
+
+    // Jump to address n if following condition is true:
+    // n = one byte signed immediate value
+    // cc = NZ, Jump if Z flag is reset.
+    // cc = Z, Jump if Z flag is set.
+    // cc = NC, Jump if C flag is reset.
+    // cc = C, Jump if C flag is set.
+    inline void jpcc(CParam cParam)
+    {
+        bool bJump = false;
+        switch (cParam)
+        {
+        case C_NZ:
+            bJump = ZF == 0; break;
+        case C_Z:
+            bJump = ZF != 0; break;
+        case C_NC:
+            bJump = CF == 0; break;
+        case C_C:
+            bJump = CF != 0; break;
+        }
+
+        m_nCycles += 4;
+
+        if (bJump)
+        {
+            jp(m_nWord);
+            return;
+        }
+
+        PC += 3;        
     };
 
     // Add n to current address and jump to it.
@@ -177,23 +359,19 @@ private:
     // cc = Z, Jump if Z flag is set.
     // cc = NC, Jump if C flag is reset.
     // cc = C, Jump if C flag is set.
-    inline void jrccn(JRCParam jrcParam)
+    inline void jrccn(CParam cParam)
     {
         bool bJump = false;
-        switch (jrcParam)
+        switch (cParam)
         {
-        case JRC_NZ:
-            bJump = ZF == 0;
-            break;
-        case JRC_Z:
-            bJump = ZF != 0;
-            break;
-        case JRC_NC:
-            bJump = CF == 0;
-            break;
-        case JRC_C:
-            bJump = CF != 0;
-            break;
+        case C_NZ:
+            bJump = ZF == 0; break;
+        case C_Z:
+            bJump = ZF != 0; break;
+        case C_NC:
+            bJump = CF == 0; break;
+        case C_C:
+            bJump = CF != 0; break;
         }
 
         if (bJump)
@@ -206,7 +384,15 @@ private:
         m_nCycles += 7;
     };
 
-    //Push address of next instruction onto stack and then jump to address nn.
+    // Push present address onto stack. Jump to address $0000 + n.
+    // n = $00,$08,$10,$18,$20,$28,$30,$38
+    inline void rst(uint8 nHex)
+    {
+        call($(0x0000) + $(nHex));
+        m_nCycles += 8;
+    };
+
+    // Push address of next instruction onto stack and then jump to address nn.
     inline void call(uint16 nAddr)
     {
         SP -= 2;
@@ -218,24 +404,150 @@ private:
         m_nCycles += 12;
     };
 
+    // Call address n if following condition is true:
+    // cc = NZ, Jump if Z flag is reset.
+    // cc = Z, Jump if Z flag is set.
+    // cc = NC, Jump if C flag is reset.
+    // cc = C, Jump if C flag is set.
+    inline void callcc(uint16 nAddr, CParam cParam)
+    {
+        bool bCall = false;
+
+        switch (cParam)
+        {
+        case C_NZ:
+            bCall = ZF == 0; break;
+        case C_Z:
+            bCall = ZF != 0; break;
+        case C_NC:
+            bCall = CF == 0; break;
+        case C_C:
+            bCall = CF != 0; break;
+        }
+
+        if (bCall)
+        {
+            SP -= 2;
+            $(SP) = static_cast<uint8>(PC & 0x00ff);
+            $(SP+1) = static_cast<uint8>((PC & 0xff00) >> 8);
+
+            jp(nAddr);
+        }
+
+        m_nCycles += 12;
+        PC += bCall ? 0 : 3;
+    }
+
+    // Push register pair nn onto stack.
+    // Decrement Stack Pointer (SP) twice.
+    inline void push(OParam oParam)
+    {        
+        reg Reg;
+
+        switch (oParam)
+        {
+        case regAF:
+            Reg = af; break;
+        case regBC:
+            Reg = bc; break;
+        case regDE:
+            Reg = de; break;
+        case regHL:
+            Reg = hl; break;
+        default:
+            assert(0);
+            return;
+        }
+
+        SP -= 2;
+        $(SP) = Reg.u.lo;
+        $(SP+1) = Reg.u.hi;
+
+        ++PC;
+        m_nCycles += 16;
+    };
+
+    inline void pop(OParam oParam)
+    {
+        reg* pReg = NULL;
+
+        switch (oParam)
+        {
+        case regAF:
+            pReg = &af; break;
+        case regBC:
+            pReg = &bc; break;
+        case regDE:
+            pReg = &de; break;
+        case regHL:
+            pReg = &hl; break;
+        default:
+            assert(0);
+            return;
+        }
+        
+        pReg->u.lo = $(SP);
+        pReg->u.hi = $(SP+1);
+
+        SP += 2;
+
+        ++PC;
+        m_nCycles += 12;
+    };
+
+    // Pop two bytes from stack & jump to that address.
+    inline void ret()
+    {
+        jp($(SP) | ($(SP) << 8));
+        m_nCycles += 4;
+        SP += 2;
+    };
+
+    // Return if following condition is true:
+    // cc = NZ, Return if Z flag is reset.
+    // cc = Z, Return if Z flag is set.
+    // cc = NC, Return if C flag is reset.
+    // cc = C, Return if C flag is set.
+    inline void retcc(CParam cParam)
+    {
+        bool bReturn = false;
+        switch (cParam)
+        {
+        case C_NZ:
+            bReturn = ZF == 0; break;
+        case C_Z:
+            bReturn = ZF != 0; break;
+        case C_NC:
+            bReturn = CF == 0; break;
+        case C_C:
+            bReturn = CF != 0; break;
+        }
+
+        if (bReturn)
+        {            
+            ret();
+            m_nCycles += 4;
+            return;
+        }
+
+        PC += 2;
+        m_nCycles += 8;
+    }
+
     // Put value nn (16-bit) into n (n = BC,DE,HL,SP).
-    inline void ldn16(LDNParam ldnParam)
+    inline void ldn16(OParam oParam)
     {
         uint16* pRegVal = NULL;
-        switch (ldnParam)
+        switch (oParam)
         {
-        case LDN_BC:
-            pRegVal = &BC;
-            break;
-        case LDN_DE:
-            pRegVal = &DE;
-            break;
-        case LDN_HL:
-            pRegVal = &HL;
-            break;
-        case LDN_SP:
-            pRegVal = &SP;
-            break;
+        case regBC:
+            pRegVal = &BC; break;
+        case regDE:
+            pRegVal = &DE; break;
+        case regHL:
+            pRegVal = &HL; break;
+        case regSP:
+            pRegVal = &SP; break;
         }
 
         *pRegVal = m_nWord;
@@ -244,69 +556,150 @@ private:
         m_nCycles += 12;
     };
 
+    // Put Stack Pointer (SP) at address n.
+    inline void ldnSP()
+    {
+        $(m_nWord) = static_cast<uint8>(SP & 0x00ff);
+        $(m_nWord+1) = static_cast<uint8>((SP & 0xff00) >> 8);
+        PC += 3;
+        m_nCycles += 20;
+    };
+
+    // Put HL into SP
+    inline void ldSPHL()
+    {
+        SP = HL;
+        ++PC;
+        m_nCycles += 8;
+    }
+
+    // Put value nn into n.
+    // nn = B,C,D,E,H,L ?--(BC,DE,HL,SP)--?
+    // n = 8 bit immediate value
+    inline void ldn8(OParam oParam)
+    {
+        uint8* pRegVal = NULL;
+        switch (oParam)
+        {
+        case regB:
+            pRegVal = &B; break;
+        case regC:
+            pRegVal = &C; break;
+        case regD:
+            pRegVal = &D; break;
+        case regE:
+            pRegVal = &E; break;
+        case regH:
+            pRegVal = &H; break;
+        case regL:
+            pRegVal = &L; break;
+        default:
+            assert(0);
+            return;
+        };
+
+        *pRegVal = m_nByte;
+        PC += 2;
+        m_nCycles += 8;
+    };
+
     // Put value n into A.
     // n = A,B,C,D,E,H,L,(BC),(DE),(HL),(nn),#)
     // nn = two byte immediate value. (LS byte first.)
-    inline void lda8(LDAParam ldaParam)
+    inline void ldan8(OParam oParam)
     {
         uint8 nByte = m_nByte;
 
-        if (ldaParam == LDA_A)
+        if (oParam == regA)
             goto lda8_end;
 
-        if (ldaParam > LDA_N)
+        if (oParam > valByte)
         {
             // nByte will have the value at the address mentioned
-            switch (ldaParam)
+            switch (oParam)
             {
-            case LDA_BC:
-                nByte = $(BC);
-                break;
-            case LDA_DE:
-                nByte = $(DE);
-                break;
-            case LDA_HL:
-                nByte = $(HL);
-                break;
-            case LDA_NN:
-                nByte = $(m_nWord);
-                break;
+            case regBC:
+                nByte = $(BC); break;
+            case regDE:
+                nByte = $(DE); break;
+            case regHL:
+                nByte = $(HL); break;
+            case valWord:
+                nByte = $(m_nWord); break;
             }
         } else {
-            switch (ldaParam)
+            switch (oParam)
             {
-            case LDA_A:
-                nByte = A;
-                break;
-            case LDA_B:
-                nByte = B;
-                break;
-            case LDA_C:
-                nByte = C;
-                break;
-            case LDA_D:
-                nByte = D;
-                break;
-            case LDA_E:
-                nByte = E;
-                break;
-            case LDA_H:
-                nByte = H;
-                break;
-            case LDA_L:
-                nByte = L;
-                break;
+            case regA:
+                nByte = A; break;
+            case regB:
+                nByte = B; break;
+            case regC:
+                nByte = C; break;
+            case regD:
+                nByte = D; break;
+            case regE:
+                nByte = E; break;
+            case regH:
+                nByte = H; break;
+            case regL:
+                nByte = L; break;
             }
         }
 
         A = nByte;
 lda8_end:        
-        if (ldaParam < LDA_N)
+        if (oParam < valByte)
         {
             m_nCycles += 4;
             ++PC;
-        } else if (ldaParam < LDA_NN)
+        } else if (oParam < valWord) {
+            m_nCycles += 8;
+            PC += 2;            
+        } else  {
+            m_nCycles += 16;
+            PC += 3;
+        }
+    };
+
+    // Put value A into n.
+    // n = A,B,C,D,E,H,L,(BC),(DE),(HL),(nn))
+    // nn = two byte immediate value. (LS byte first.)
+    inline void ldn8a(OParam oParam)
+    {
+        switch (oParam)
         {
+        case regB:
+            B = A; break;
+        case regC:
+            C = A; break;
+        case regD:
+            D = A; break;
+        case regE:
+            E = A; break;
+        case regH:
+            H = A; break;
+        case regL:
+            L = A; break;
+        case regHL:
+            $(HL) = A; break;
+        case regDE:
+            $(DE) = A; break;
+        case regBC:
+            $(BC) = A; break;
+        case valWord:
+            $(m_nWord) = A; break;
+        default:
+            assert(0);
+            return;
+        }
+
+
+        if (oParam < valByte)
+        {
+            m_nCycles += 4;
+            ++PC;
+        } else if (oParam < valWord) {
             m_nCycles += 8;
             PC += 2;            
         } else  {
@@ -317,93 +710,78 @@ lda8_end:
 
     // Put value r2 into r1.
     // r1,r2 = A,B,C,D,E,H,L,(HL)
-    inline void ldrr(LDRParam ldrParamD, LDRParam ldrParamS)
+    inline void ldrr(OParam oParamD, OParam oParamS)
     {
-        uint8* pDest = NULL,* pSrc = NULL;
+        uint8* pDest = NULL;
+        uint8  nSrc = 0;
 
-        if (ldrParamD == ldrParamS)
+        if (oParamD == oParamS)
             goto ldrr_end;
 
-        switch (ldrParamD)
+        switch (oParamD)
         {
-        case LDR_A:
-            pDest = &A;
-            break;
-        case LDR_B:
-            pDest = &B;
-            break;
-        case LDR_C:
-            pDest = &C;
-            break;
-        case LDR_D:
-            pDest = &D;
-            break;
-        case LDR_E:
-            pDest = &E;
-            break;
-        case LDR_H:
-            pDest = &H;
-            break;
-        case LDR_L:
-            pDest = &L;
-            break;
-        case LDR_HL:
-            pDest = &$(HL);
-            break;
+        case regA:
+            pDest = &A; break;
+        case regB:
+            pDest = &B; break;
+        case regC:
+            pDest = &C; break;
+        case regD:
+            pDest = &D; break;
+        case regE:
+            pDest = &E; break;
+        case regH:
+            pDest = &H; break;
+        case regL:
+            pDest = &L; break;
+        case regHL:
+            pDest = &$(HL); break;
         default:
             assert(0);
             return;
         }
 
-        switch (ldrParamS)
+        switch (oParamS)
         {
-        case LDR_A:
-            pSrc = &A;
-            break;
-        case LDR_B:
-            pSrc = &B;
-            break;
-        case LDR_C:
-            pSrc = &C;
-            break;
-        case LDR_D:
-            pSrc = &D;
-            break;
-        case LDR_E:
-            pSrc = &E;
-            break;
-        case LDR_H:
-            pSrc = &H;
-            break;
-        case LDR_L:
-            pSrc = &L;
-            break;
-        case LDR_HL:
-            pSrc = &$(HL);
-            break;
-        case LDR_N:
-            pSrc = &m_nByte;
+        case regA:
+            nSrc = A; break;
+        case regB:
+            nSrc = B; break;
+        case regC:
+            nSrc = C; break;
+        case regD:
+            nSrc = D; break;
+        case regE:
+            nSrc = E; break;
+        case regH:
+            nSrc = H; break;
+        case regL:
+            nSrc = L; break;
+        case regHL:
+            nSrc = $(HL); break;
+        case valByte:
+            nSrc = m_nByte; break;
         default:
             assert(0);
             return;
         }
 
-        if (!pDest || !pSrc)
+        if (!pDest)
         {
             assert(0);
             return;
         }
 
-        *pDest = *pSrc;
+        *pDest = nSrc;
 
     ldrr_end:
-        if (ldrParamS == LDR_N)
+        if (oParamS == valByte)
         {
             PC += 2;
             m_nCycles += 12;
         } else {
             ++PC;
-            if (ldrParamS == LDR_HL || ldrParamD == LDR_HL)
+            if (oParamS == regHL || oParamD == regHL)
                 m_nCycles += 8;
             else
                 m_nCycles += 4;
@@ -424,41 +802,44 @@ lda8_end:
         m_nCycles = 12;
     };
 
+    // Put A into memory address HL. Increment HL.
+    inline void ldhli(bool bAtoHL)
+    {
+        if (bAtoHL)
+            $(HL) = A;
+        else
+            A = $(HL);
+
+        inc16(regHL);
+    };
+
     // Compare A with n. This is basically an A - n subtraction instruction but the results are thrown
     // away. n = A,B,C,D,E,H,L,(HL),#
     // Z - Set if result is zero. (Set if A = n.)
     // N - Set.
     // H - Set if no borrow from bit 4.
     // C - Set for no borrow. (Set if A < n.)
-    inline void cp(CPParam cpParam)
+    inline void cp(OParam oParam)
     {
         uint8 nByte = m_nByte;
-        switch (cpParam)
+        switch (oParam)
         {
-        case CP_A:
-            nByte = A;
-            break;
-        case CP_B:
-            nByte = B;
-            break;
-        case CP_C:
-            nByte = C;
-            break;
-        case CP_D:
-            nByte = D;
-            break;
-        case CP_E:
-            nByte = E;
-            break;
-        case CP_H:
-            nByte = H;
-            break;
-        case CP_L:
-            nByte = L;
-            break;
-        case CP_HL:
-            nByte = $(HL);
-            break;
+        case regA:
+            nByte = A; break;
+        case regB:
+            nByte = B; break;
+        case regC:
+            nByte = C; break;
+        case regD:
+            nByte = D; break;
+        case regE:
+            nByte = E; break;
+        case regH:
+            nByte = H; break;
+        case regL:
+            nByte = L; break;
+        case regHL:
+            nByte = $(HL); break;
         default:
             break;
         }
@@ -471,8 +852,8 @@ lda8_end:
         if (A < nByte)
             setFlag(SF_C);
 
-        PC += (cpParam == CP_N) ? 2 : 1;
-        if (cpParam > CP_L)
+        PC += (oParam == valByte) ? 2 : 1;
+        if (oParam > regL)
             m_nCycles += 8;  
         else
             m_nCycles += 4;
@@ -483,38 +864,29 @@ lda8_end:
     // N - Reset.
     // H - Set.
     // C - Reset.
-    inline void and(LParam lParam)
+    inline void and(OParam oParam)
     {
         uint8 nRes = 0;
-        switch (lParam)
+        switch (oParam)
         {
-        case LOG_A:
-            nRes = A & A;
-            break;
-        case LOG_B:
-            nRes = A & B;
-            break;
-        case LOG_C:
-            nRes = A & C;
-            break;
-        case LOG_D:
-            nRes = A & D;
-            break;
-        case LOG_E:
-            nRes = A & E;
-            break;
-        case LOG_H:
-            nRes = A & H;
-            break;
-        case LOG_L:
-            nRes = A & L;
-            break;
-        case LOG_HL:
-            nRes = A & $(HL);
-            break;
-        case LOG_N:
-            nRes = A & m_nByte;
-            break;
+        case regA:
+            nRes = A & A; break;
+        case regB:
+            nRes = A & B; break;
+        case regC:
+            nRes = A & C; break;
+        case regD:
+            nRes = A & D; break;
+        case regE:
+            nRes = A & E; break;
+        case regH:
+            nRes = A & H; break;
+        case regL:
+            nRes = A & L; break;
+        case regHL:
+            nRes = A & $(HL); break;
+        case valByte:
+            nRes = A & m_nByte; break;
         }
 
         if (!nRes)
@@ -525,21 +897,437 @@ lda8_end:
 
         A = nRes;
 
-        if (lParam < LOG_HL)
+        if (oParam <= regL)
         {
             ++PC;
             m_nCycles += 4;
-        } else if (lParam < LOG_N)  {
-            ++PC;
+        } else if (oParam == valByte)  {
+            PC += 2;
             m_nCycles += 8;
         } else {
-            PC += 2;
+            ++PC;
             m_nCycles += 8;
         }
     };
 
+    // Logical OR n with register A, result in A. n = A,B,C,D,E,H,L,(HL),#
+    // Z - Set if result is zero. N - Reset. H - Reset. C - Reset.
+    inline void or(OParam oParam)
+    {
+        uint8 nByte = m_nByte;
+        switch (oParam)
+        {
+        case regA:
+            nByte = A; break;
+        case regB:
+            nByte = B; break;
+        case regC:
+            nByte = C; break;
+        case regD:
+            nByte = D; break;
+        case regE:
+            nByte = E; break;
+        case regH:
+            nByte = H; break;
+        case regL:
+            nByte = L; break;
+        case regHL:
+            nByte = $(HL); break;
+        default:
+            break;
+        }
+
+        A |= nByte;
+        if (!A)
+            setFlag(SF_Z);
+        resetFlag(SF_N);
+        resetFlag(SF_H);
+        resetFlag(SF_C);
+
+        PC += oParam == valByte ? 2 : 1;
+        m_nCycles += oParam > regL ? 8 : 4;
+    };
+
+    // Logical exclusive OR n with register A, result in A. n = A,B,C,D,E,H,L,(HL),#
+    // Z - Set if result is zero. N - Reset. H - Reset. C - Reset.
+    inline void xor(OParam oParam)
+    {
+        uint8 nByte = m_nByte;
+        switch (oParam)
+        {
+        case regA:
+            nByte = A; break;
+        case regB:
+            nByte = B; break;
+        case regC:
+            nByte = C; break;
+        case regD:
+            nByte = D; break;
+        case regE:
+            nByte = E; break;
+        case regH:
+            nByte = H; break;
+        case regL:
+            nByte = L; break;
+        case regHL:
+            nByte = $(HL); break;
+        default:
+            break;
+        }
+
+        A ^= nByte;
+        if (!A)
+            setFlag(SF_Z);
+        resetFlag(SF_N);
+        resetFlag(SF_H);
+        resetFlag(SF_C);
+
+        PC += oParam == valByte ? 2 : 1;
+        m_nCycles += oParam > regL ? 8 : 4;
+    }
+
     // Reset bit b in register r. b = 0 - 7, r = A,B,C,D,E,H,L,(HL)
-    inline void res()
+    inline void res(OParam oParam)
+    {
+        uint8* pReg = NULL;
+        uint8  bit = m_nByte & 0x0f;
+        switch (oParam)
+        {
+        case regA:
+            pReg = &A; break;
+        case regB:
+            pReg = &B; break;
+        case regC:
+            pReg = &C; break;
+        case regD:
+            pReg = &D; break;
+        case regE:
+            pReg = &E; break;
+        case regH:
+            pReg = &H; break;
+        case regL:
+            pReg = &L; break;
+        case regHL:
+            pReg = &$(HL); break;
+        default:
+            return;
+        }
+
+        *pReg &= ~(1 << bit);
+
+        m_nCycles += (oParam == regHL) ? 16 : 8;
+        PC += 2;
+    };
+
+    // Add n to HL. n = BC,DE,HL,SP
+    // Z - Not affected.
+    // N - Reset.
+    // H - Set if carry from bit 11.
+    // C - Set if carry from bit 15.
+    inline void addHL(OParam oParam)
+    {
+        uint16 nRegVal = 0;
+        switch (oParam)
+        {
+        case regBC:
+            nRegVal = BC; break;
+        case regDE:
+            nRegVal = DE; break;
+        case regHL:
+            nRegVal = HL; break;
+        case regSP:
+            nRegVal = SP; break;
+        default:
+            assert(0);
+            return;
+        }
+
+        resetFlag(SF_N);
+        // check for carry on bit 15
+        if ((HL & 0x8000) && ((HL & 0x8000) == (nRegVal & 0x8000)))
+            setFlag(SF_C);
+        // check for carry on bit 11
+        if ((HL & 0x0800) && ((HL & 0x0800) == (nRegVal & 0x0800)))
+            setFlag(SF_H);
+        HL += nRegVal;
+
+        ++PC;
+        m_nCycles += 8;
+    };
+
+    // Add n to A. n = A,B,C,D,E,H,L,(HL),#
+    // Z - Set if result is zero.
+    // N - Reset.
+    // H - Set if carry from bit 3.
+    // C - Set if carry from bit 7.
+    inline void add(OParam oParam)
+    {
+        uint8 nByte = m_nByte;
+        switch (oParam)
+        {
+        case regA:
+            nByte = A; break;
+        case regB:
+            nByte = B; break;
+        case regC:
+            nByte = C; break;
+        case regD:
+            nByte = D; break;
+        case regE:
+            nByte = E; break;
+        case regH:
+            nByte = H; break;
+        case regL:
+            nByte = L; break;
+        case regHL:
+            nByte = $(HL); break;
+        default:
+            break;
+        }
+
+        if (A + nByte == 0)
+            setFlag(SF_Z);
+        resetFlag(SF_N);
+        // check for carry on bit 3
+        if ((A & 0x0f) + (nByte & 0x0f) > 0x0f)
+            setFlag(SF_H);
+
+        // check for carry on bit 7
+        if ((A & 0xf0) + (nByte & 0xf0) > 0xff)
+            setFlag(SF_C);
+        
+
+        A += nByte;
+
+        PC += (oParam == valByte) ? 2 : 1;
+        m_nCycles += (oParam > regL) ? 8 : 4;
+    };
+
+    // Increment register nn. nn = BC,DE,HL,SP    
+    inline void inc16(OParam oParam)
+    {
+        uint16* pRegVal = NULL;
+        switch (oParam)
+        {
+        case regBC:
+            pRegVal = &BC; break;
+        case regDE:
+            pRegVal = &DE; break;
+        case regHL:
+            pRegVal = &HL; break;
+        case regSP:
+            pRegVal = &SP; break;
+        default:
+            assert(0);
+            return;
+        }
+
+        ++(*pRegVal);
+        ++PC;
+        m_nCycles += 8;
+    };
+
+    // Increment register n. n = A,B,C,D,E,H,L,(HL)
+    // Z - Set if result is zero.
+    // N - Reset.
+    // H - Set if carry from bit 3.
+    // C - Not affected.
+    inline void inc8(OParam oParam)
+    {
+        uint8* pReg = NULL;
+        switch (oParam)
+        {
+        case regA:
+            pReg = &A; break;
+        case regB:
+            pReg = &B; break;
+        case regC:
+            pReg = &C; break;
+        case regD:
+            pReg = &D; break;
+        case regE:
+            pReg = &E; break;
+        case regH:
+            pReg = &H; break;
+        case regL:
+            pReg = &L; break;
+        case regHL:
+            pReg = &$(HL); break;
+        default:
+            assert(0);
+            return;
+        }
+
+        if (*pReg + 1 == 0)
+            setFlag(SF_Z);
+        resetFlag(SF_N);
+        if (*pReg == 0x0f)
+        {
+            setFlag(SF_H);
+        }
+
+        ++*pReg;
+
+        ++PC;
+        m_nCycles += (oParam == regHL) ? 12 : 4;
+    };
+
+    // Decrement register nn. nn = BC,DE,HL,SP
+    inline void dec16(OParam oParam)
+    {
+        uint16* pRegVal = NULL;
+        switch (oParam)
+        {
+        case regBC:
+            pRegVal = &BC; break;
+        case regDE:
+            pRegVal = &DE; break;
+        case regHL:
+            pRegVal = &HL; break;
+        case regSP:
+            pRegVal = &SP; break;
+        default:
+            assert(0);
+            return;
+        }
+
+        --(*pRegVal);
+        ++PC;
+        m_nCycles += 8;
+    };
+
+    // Decrement register n. n = A,B,C,D,E,H,L,(HL)
+    // Z - Set if result is zero.
+    // N - Set.
+    // H - Set if no borrow from bit 4.
+    // C - Not affected.
+    inline void dec8(OParam oParam)
+    {
+        uint8* pReg = NULL;
+        switch (oParam)
+        {
+        case regA:
+            pReg = &A; break;
+        case regB:
+            pReg = &B; break;
+        case regC:
+            pReg = &C; break;
+        case regD:
+            pReg = &D; break;
+        case regE:
+            pReg = &E; break;
+        case regH:
+            pReg = &H; break;
+        case regL:
+            pReg = &L; break;
+        case regHL:
+            pReg = &$(HL); break;
+        default:
+            assert(0);
+            return;
+        }
+
+        if (*pReg == 1)
+            setFlag(SF_Z);
+        setFlag(SF_N);
+        // check for borrow on bit 4
+        if ((*pReg & 0x10) != (--*pReg & 0x10))
+            setFlag(SF_H);
+
+        if (oParam == regHL)
+            m_nCycles += 12;
+        else
+            m_nCycles += 4;
+
+        ++PC;
+    };
+
+    // Subtract n from A. n = A,B,C,D,E,H,L,(HL),#
+    // Z - Set if result is zero.
+    // N - Set.
+    // H - Set if no borrow from bit 4.
+    // C - Set if no borrow.
+    inline void sub(OParam oParam)
+    {
+        uint8 nByte = m_nByte;
+        switch (oParam)
+        {
+        case regA:
+            nByte = A; break;
+        case regB:
+            nByte = B; break;
+        case regC:
+            nByte = C; break;
+        case regD:
+            nByte = D; break;
+        case regE:
+            nByte = E; break;
+        case regH:
+            nByte = H; break;
+        case regL:
+            nByte = L; break;
+        case regHL:
+            nByte = $(HL); break;
+        default:
+            break;
+        }
+
+        setFlag(SF_N);
+        if (A == nByte)
+            setFlag(SF_Z);   
+        if ((A & 0x0f) < (nByte & 0x0f))
+            setFlag(SF_H);
+        if (A < nByte)
+            setFlag(SF_C);
+
+        A -= nByte;
+        PC += oParam == valByte ? 2 : 1;
+        m_nCycles += oParam > regL ? 8 : 4;
+    };
+
+    // Subtract n + Carry flag from A. n = A,B,C,D,E,H,L,(HL),#
+    inline void sbc(OParam oParam)
+    {
+        uint8 nByte = 0;
+        switch (oParam)
+        {
+        case regA:
+            nByte = A; break;
+        case regB:
+            nByte = B; break;
+        case regC:
+            nByte = C; break;
+        case regD:
+            nByte = D; break;
+        case regE:
+            nByte = E; break;
+        case regH:
+            nByte = H; break;
+        case regL:
+            nByte = L; break;
+        case regHL:
+            nByte = $(HL); break;
+        default:
+            assert(0);
+            return;
+        }
+
+        nByte += CF;
+        setFlag(SF_N);
+        if (A == nByte)
+            setFlag(SF_Z);   
+        if ((A & 0x0f) < (nByte & 0x0f))
+            setFlag(SF_H);
+        if (A < nByte)
+            setFlag(SF_C);
+
+        A -= nByte;
+        ++PC;
+        if (oParam > regL)
+            m_nCycles += 8;  
+        else
+            m_nCycles += 4;
+    };
 
 #else
     // n & A, result in A, set flags
